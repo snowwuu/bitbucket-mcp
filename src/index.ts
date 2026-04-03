@@ -346,8 +346,6 @@ function normalizeBitbucketConfig(rawConfig: BitbucketConfig): BitbucketConfig {
       const pathname = parsed.pathname.replace(/\/+$/, "");
       if (!pathname.startsWith("/2.0")) {
         normalizedConfig.baseUrl = "https://api.bitbucket.org/2.0";
-      } else {
-        normalizedConfig.baseUrl = "https://api.bitbucket.org/2.0";
       }
     }
 
@@ -2272,7 +2270,7 @@ class BitbucketServer {
           throw new McpError(
             ErrorCode.InternalError,
             `Bitbucket API error: ${
-              error.response?.data.message ?? error.message
+              error.response?.data?.message ?? error.message
             }`
           );
         }
@@ -2939,8 +2937,15 @@ class BitbucketServer {
         `/repositories/${workspace}/${repo_slug}/pullrequests/${pull_request_id}`
       );
 
-      const sourceCommit = prResponse.data.source.commit.hash;
-      const destinationCommit = prResponse.data.destination.commit.hash;
+      const sourceCommit = prResponse.data?.source?.commit?.hash;
+      const destinationCommit = prResponse.data?.destination?.commit?.hash;
+
+      if (!sourceCommit || !destinationCommit) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          "Pull request response missing expected commit information"
+        );
+      }
 
       // Construct the correct diff URL with the proper format
       // The format is: /repositories/{workspace}/{repo_slug}/diff/{source_repo}:{source_commit}%0D{destination_commit}?from_pullrequest_id={pr_id}&topic=true
@@ -4733,7 +4738,9 @@ class BitbucketServer {
         task_id,
       });
 
-      const response = await this.api.get(`/tasks/${task_id}`);
+      const response = await this.api.get(
+        `/repositories/${workspace}/${repo_slug}/pullrequests/${pull_request_id}/tasks/${task_id}`
+      );
 
       return {
         content: [
@@ -4777,7 +4784,10 @@ class BitbucketServer {
       if (content !== undefined) data.content = content;
       if (state !== undefined) data.state = state;
 
-      const response = await this.api.put(`/tasks/${task_id}`, data);
+      const response = await this.api.put(
+        `/repositories/${workspace}/${repo_slug}/pullrequests/${pull_request_id}/tasks/${task_id}`,
+        data
+      );
 
       return {
         content: [
@@ -4815,7 +4825,9 @@ class BitbucketServer {
         task_id,
       });
 
-      await this.api.delete(`/tasks/${task_id}`);
+      await this.api.delete(
+        `/repositories/${workspace}/${repo_slug}/pullrequests/${pull_request_id}/tasks/${task_id}`
+      );
 
       return {
         content: [{ type: "text", text: "Task deleted successfully." }],
